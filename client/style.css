@@ -157,3 +157,19 @@ form img {
   height: 30px;
 }
 
+.logout-button {
+  display: inline-block;
+  padding: 10px 20px;
+  background-color: #f44336; /* Red */
+  color: white;
+  text-align: center;
+  text-decoration: none;
+  border: none;
+  cursor: pointer;
+  font-size: 16px;
+  border-radius: 5px;
+}
+
+.logout-button:hover {
+  background-color: #da190b; /* Darker red on hover */
+}

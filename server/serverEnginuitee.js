@@ -4,6 +4,11 @@ import cors from 'cors';
 import { Configuration, OpenAIApi} from 'openai';
 import fs from 'fs';
 import readline from 'readline';
+import passport from 'passport';
+import GoogleStrategy from 'passport-google-oauth20';
+import session from 'express-session';
+import User from './models/User'; // Adjust the path to point to your User model file
+
 
 dotenv.config();
 
@@ -16,6 +21,53 @@ const openai = new OpenAIApi(configuration);
 const app = express();
 app.use(cors());
 app.use(express.json());
+
+// Session configuration
+app.use(session({ secret: 'your-secret-key' }));
+app.use(passport.initialize());
+app.use(passport.session());
+
+
+// Google OAuth2 Strategy configuration
+passport.use(new GoogleStrategy({
+  clientID: 'YOUR_GOOGLE_CLIENT_ID',
+  clientSecret: 'YOUR_GOOGLE_CLIENT_SECRET',
+  callbackURL: 'http://localhost:5000/auth/google/callback'
+}, (accessToken, refreshToken, profile, done) => {
+  // Find or create user in your database
+  // ...
+  return done(null, user);
+}));
+
+passport.serializeUser((user, done) => {
+  done(null, user.id);
+});
+
+passport.deserializeUser((id, done) => {
+  // Find user by ID in your database
+  // ...
+  done(null, user);
+});
+
+// Google OAuth2 Routes
+app.get('/auth/google', passport.authenticate('google', {
+  scope: ['profile', 'email']
+}));
+
+app.get('/auth/google/callback', passport.authenticate('google', { failureRedirect: '/' }), (req, res) => {
+  res.redirect('/enginuiteeai'); // Redirect to EnginuiteeAI page
+});
+
+// Serve login.html in Your Server File
+app.get('/login', (req, res) => {
+  res.sendFile(__dirname + '/login.html');
+});
+
+// Implement Logout Route
+app.get('/logout', (req, res) => {
+  req.logout();
+  res.redirect('/login');
+});
 
 app.get('/', async(req, res) => {
     res.status(200).send({
@@ -76,37 +128,52 @@ let promptList = [
       `}
   ];
 
-app.post('/', async (req, res) => {
+  app.post('/', async (req, res) => {
     try {
-        const userMessage = req.body.message;
-        promptList.push({
-          role: "user",
-          content: userMessage
-        });
-
-        const response = await openai.createChatCompletion({
-            model: "gpt-4",
-            messages: promptList,
-            temperature: 1,
-            max_tokens: 427,
-            top_p: 1,
-            frequency_penalty: 0,
-            presence_penalty: 0,
-        });
-
-        console.log(response); // Logs the response
-
-        const message = response.data.choices[0].message.content;
-        promptList.push({
-          role: "assistant",
-          content: message
-        });
-        
-        // Send the entire response data object back to the client
-        res.status(200).send(response.data);
+      const userMessage = req.body.message;
+      promptList.push({
+        role: "user",
+        content: userMessage
+      });
+  
+      const response = await openai.createChatCompletion({
+          model: "gpt-4",
+          messages: promptList,
+          temperature: 1,
+          max_tokens: 427,
+          top_p: 1,
+          frequency_penalty: 0,
+          presence_penalty: 0,
+      });
+  
+      const message = response.data.choices[0].message.content;
+      promptList.push({
+        role: "assistant",
+        content: message
+      });
+  
+      // Find user by email or other identifier
+      const user = await User.findOne({ email: req.user.email });
+  
+      // Add conversation to user's conversations array
+      user.conversations.push({
+        role: "user",
+        content: userMessage
+      });
+  
+      user.conversations.push({
+        role: "assistant",
+        content: message
+      });
+  
+      // Save user
+      await user.save();
+  
+      // Send the entire response data object back to the client
+      res.status(200).send(response.data);
     } catch (error) {
-        console.error("OpenAI API Error:", error.message);
-        res.status(500).send({ error: error.message });
+      console.error("OpenAI API Error:", error.message);
+      res.status(500).send({ error: error.message });
     }   
-});
-app.listen(5000, () => console.log('Server is running on port http://localhost:5000'));
+  });
+  app.listen(5000, () => console.log('Server is running on port http://localhost:5000'));
