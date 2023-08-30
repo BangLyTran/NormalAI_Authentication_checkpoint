@@ -1,7 +1,20 @@
+// Check if user is authenticated
+//fetch('http://localhost:5000/check-auth')
+//  .then(response => response.json())
+//  .then(data => {
+//    if (!data.isAuthenticated) {
+//      window.location.href = 'http://localhost:5000/login'; // Redirect to login page
+//    }
+//  });
+
 import bot from './assets/bot.svg'
 import user from './assets/user.svg'
 
 const form = document.querySelector('form');
+
+// Log the form element to the console for debugging
+console.log(form);  // Debug to see if form is null or an actual element
+
 const chatContainer = document.querySelector('#chat_container')
 
 let loadInterval;
@@ -59,6 +72,7 @@ function chatStripe(isAi, value, uniqueId) {
 }
 
 const handleSubmit = async (e) => {
+  console.log('handleSubmit called');  // Debugging line
   e.preventDefault();
 
   const formData = new FormData(form);
@@ -78,7 +92,7 @@ const handleSubmit = async (e) => {
   loader(messageDiv);
 
   // fetch data from server -> bot's response
-  const response = await fetch('https://enginuitee8.onrender.com/', {
+  const response = await fetch('http://localhost:5000', {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json'
@@ -91,23 +105,27 @@ const handleSubmit = async (e) => {
   clearInterval(loadInterval);
   messageDiv.innerHTML = '';
 
-  const data = await response.json();
-  console.log(data); // This will log the entire response to the console
+  if (response.headers.get('Content-Type').includes('application/json')) {
+    const data = await response.json();
+    console.log(data); // This will log the entire response to the console
 
-  if(response.ok) {
-    const parsedData = data.choices ? data.choices[0].message.content.trim() : JSON.stringify(data); // If data.choices is not available, convert the entire data to a string
-    
-    const rawResponse = JSON.stringify(data, null, 2); // Convert the entire data object to a string
+    if(response.ok) {
+      const parsedData = data.choices ? data.choices[0].message.content.trim() : JSON.stringify(data); // If data.choices is not available, convert the entire data to a string
 
-    const textToShow = `${parsedData}`;
+      const textToShow = `${parsedData}`;
 
-    typeText(messageDiv, textToShow);    
+      typeText(messageDiv, textToShow);    
+    } else {
+      const err = await response.text();
+
+      messageDiv.innerHTML = "Something went wrong";
+
+      alert(err);
+    }
   } else {
-    const err = await response.text();
-
-    messageDiv.innerHTML = "Something went wrong";
-
-    alert(err);
+    const text = await response.text();
+    console.log("Raw response:", text);
+    messageDiv.innerHTML = "Received non-JSON response";
   }
 }
 
